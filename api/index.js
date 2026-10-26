@@ -6,7 +6,7 @@ const axios = require('axios');
 const app = express();
 app.use(express.json());
 
-// Ganti teks di bawah dengan API Key kamu masing-masing
+// Ganti teks di bawah dengan API Key asli kamu
 const SUPABASE_URL = 'https://qqkusyfjyknbitzudgbj.supabase.co'; 
 const SUPABASE_KEY = 'PASTE_ANON_KEY_KAMU_DI_SINI';
 const GEMINI_API_KEY = 'PASTE_GEMINI_KEY_KAMU_DI_SINI';
@@ -14,6 +14,12 @@ const GEMINI_API_KEY = 'PASTE_GEMINI_KEY_KAMU_DI_SINI';
 const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
 const genAI = new GoogleGenerativeAI(GEMINI_API_KEY);
 
+// 1. Tambahkan handler GET agar Fonnte & Browser tidak error saat cek URL
+app.get('/webhook', (req, res) => {
+  res.status(200).send('Webhook Vercel Aktif!');
+});
+
+// 2. Handler POST untuk memproses pesan WhatsApp dari Fonnte
 app.post('/webhook', async (req, res) => {
   try {
     const message = req.body.message || '';
@@ -61,5 +67,4 @@ app.post('/webhook', async (req, res) => {
   }
 });
 
-// Export handler untuk Vercel
 module.exports = app;
