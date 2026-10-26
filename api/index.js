@@ -7,11 +7,12 @@ const app = express();
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-// Data API & Nomor HP milikmu
+// Config & API Keys
 const SUPABASE_URL = 'https://qqkusyfjyknbitzudgbj.supabase.co'; 
 const SUPABASE_KEY = 'sb_publishable_eIyoWRMJc7DNWlrdQpOitg_3cMBhTWv'; 
 const GEMINI_API_KEY = 'AQ.Ab8RN6LIaF8mi-HGl23weV1GX99LdnH2wEdCdFB8ezz-_N7Xkw'; 
 const MY_PHONE_NUMBER = '6289668184078'; 
+const FONNTE_TOKEN = 'nbwwLRG5gzP4UK9oAvHQ'; // Token Fonnte milikmu
 
 const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
 const genAI = new GoogleGenerativeAI(GEMINI_API_KEY);
@@ -23,8 +24,8 @@ app.post('/webhook', async (req, res) => {
   try {
     const message = req.body.message || req.body.text || '';
     const imageUrl = req.body.url || req.body.file || '';
-    
-    // Cek apakah nomor kamu di-tag / di-mention
+    const sender = req.body.sender || ''; // Nomor HP pengirim pesan
+
     const mentionedList = req.body.mentioned || [];
     const isMentioned = Array.isArray(mentionedList) 
       ? mentionedList.includes(MY_PHONE_NUMBER) 
@@ -32,7 +33,7 @@ app.post('/webhook', async (req, res) => {
 
     const msgLower = message.toLowerCase();
 
-    // Hanya proses jika nomor kamu DI-TAG dan mengandung kata kunci
+    // Jalankan hanya jika di-tag DAN ada kata kunci 'pengajuan reimburse' / 'pemasukan'
     if (isMentioned && (msgLower.includes('pengajuan reimburse') || msgLower.includes('pemasukan'))) {
       let nominal = 0;
       let tipe = msgLower.includes('pemasukan') ? 'pemasukan' : 'pengeluaran';
@@ -44,7 +45,7 @@ app.post('/webhook', async (req, res) => {
         if (!isNaN(cleanNum)) nominal = parseFloat(cleanNum);
       }
 
-      // Ekstraksi dari gambar via Gemini AI jika melampirkan foto
+      // Ekstraksi dari gambar via Gemini AI jika melampirkan gambar
       if (imageUrl && GEMINI_API_KEY) {
         try {
           const imgResp = await axios.get(imageUrl, { responseType: 'arraybuffer' });
@@ -62,7 +63,7 @@ app.post('/webhook', async (req, res) => {
         }
       }
 
-      // Simpan ke database Supabase
+      // Simpan data ke database Supabase
       await supabase.from('transactions').insert([
         {
           type: tipe,
@@ -76,14 +77,23 @@ app.post('/webhook', async (req, res) => {
 
       const replyText = `✅ *Data Berhasil Dicatat*\n💰 Nominal: Rp ${nominal.toLocaleString('id-ID')}\n📝 Keterangan: ${message}`;
 
-      return res.status(200).json({
-        status: true,
-        reply: replyText,
-        text: replyText
-      });
+      // Kirim pesan balasan langsung via API Fonnte
+      if (sender) {
+        try {
+          await axios.post('https://api.fonnte.com/send', {
+            target: sender,
+            message: replyText
+          }, {
+            headers: { 'Authorization': FONNTE_TOKEN }
+          });
+        } catch (fonnteErr) {
+          console.error('Fonnte Send API Error:', fonnteErr.message);
+        }
+      }
+
+      return res.status(200).json({ status: true, reply: replyText });
     }
 
-    // Jika tidak di-tag / kata kunci salah, abaikan
     res.status(200).send('OK');
   } catch (err) {
     console.error('General Error:', err);
