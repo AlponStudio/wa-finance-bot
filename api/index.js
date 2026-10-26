@@ -6,34 +6,35 @@ const axios = require('axios');
 const app = express();
 app.use(express.json());
 
-// Masukkan API Key kamu di sini
-const SUPABASE_URL = 'https://qqkusyfjyknbitzudgbj.supabase.co/rest/v1/'; 
+// API Keys yang sudah dimasukkan
+const SUPABASE_URL = 'https://qqkusyfjyknbitzudgbj.supabase.co'; 
 const SUPABASE_KEY = 'sb_publishable_eIyoWRMJc7DNWlrdQpOitg_3cMBhTWv'; 
 const GEMINI_API_KEY = 'AQ.Ab8RN6LIaF8mi-HGl23weV1GX99LdnH2wEdCdFB8ezz-_N7Xkw'; 
 
 const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
 const genAI = new GoogleGenerativeAI(GEMINI_API_KEY);
 
-// Root path test
-app.get('/', (req, res) => {
-  res.status(200).send('Server Vercel Aktif!');
-});
-
-// Endpoint Webhook untuk GET
+// 1. Test Endpoint via Browser (GET)
 app.get('/webhook', (req, res) => {
   res.status(200).send('Webhook Vercel Berhasil Aktif!');
 });
 
-// Endpoint Webhook untuk POST
+app.get('/', (req, res) => {
+  res.status(200).send('Server Vercel Berjalan Normal!');
+});
+
+// 2. Endpoint Menerima Pesan WhatsApp (POST)
 app.post('/webhook', async (req, res) => {
   try {
     const message = req.body.message || '';
     const imageUrl = req.body.url || '';
     
+    // Filter kata kunci
     if (message.toLowerCase().includes('pengajuan reimburse') || message.toLowerCase().includes('pemasukan')) {
       let nominal = 0;
       let tipe = message.toLowerCase().includes('pemasukan') ? 'pemasukan' : 'pengeluaran';
 
+      // Ekstraksi teks dari gambar struk/bukti TF jika ada
       if (imageUrl) {
         const imgResp = await axios.get(imageUrl, { responseType: 'arraybuffer' });
         const base64Img = Buffer.from(imgResp.data).toString('base64');
@@ -49,6 +50,7 @@ app.post('/webhook', async (req, res) => {
         if (extracted) nominal = parseFloat(extracted);
       }
 
+      // Simpan data transaksi ke Supabase
       await supabase.from('transactions').insert([
         {
           type: tipe,
@@ -60,8 +62,9 @@ app.post('/webhook', async (req, res) => {
         }
       ]);
 
+      // Kirim balasan otomatis ke WhatsApp
       return res.json({
-        reply: `✅ *Data Berhasil Dicatat (Vercel)*\n💰 Nominal: Rp ${nominal.toLocaleString('id-ID')}\n📝 Keterangan: ${message}`
+        reply: `✅ *Data Berhasil Dicatat*\n💰 Nominal: Rp ${nominal.toLocaleString('id-ID')}\n📝 Keterangan: ${message}`
       });
     }
 
