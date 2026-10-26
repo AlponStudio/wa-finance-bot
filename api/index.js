@@ -13,6 +13,9 @@ const SUPABASE_KEY = 'sb_publishable_eIyoWRMJc7DNWlrdQpOitg_3cMBhTWv';
 const GEMINI_API_KEY = 'AQ.Ab8RN6LIaF8mi-HGl23weV1GX99LdnH2wEdCdFB8ezz-_N7Xkw'; 
 const FONNTE_TOKEN = 'nbwwLRG5gzP4UK9oAvHQ'; 
 
+// Nomor Bot Baru
+const NEW_BOT_NUMBER = '6281212882363';
+
 const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
 const genAI = new GoogleGenerativeAI(GEMINI_API_KEY);
 
@@ -24,18 +27,18 @@ app.post('/webhook', async (req, res) => {
     const message = req.body.message || req.body.text || '';
     const imageUrl = req.body.url || req.body.file || '';
     
-    // Target pengiriman balasan (ID Grup atau Nomor Pengirim)
+    // Target balasan (ID Grup atau Nomor Pengirim)
     const target = req.body.group || req.body.target || req.body.sender || '';
 
-    // Cek fleksibel: Deteksi jika pesan berisi kata kunci transaksi
     const msgLower = message.toLowerCase();
     const hasKeyword = msgLower.includes('pengajuan reimburse') || msgLower.includes('pemasukan');
 
-    // Deteksi mention: Ada karakter '@' ATAU array mentioned dari Fonnte terisi
+    // Cek mention nomor baru atau tanda @
     const mentionedList = req.body.mentioned || [];
-    const isMentioned = message.includes('@') || (Array.isArray(mentionedList) && mentionedList.length > 0);
+    const isMentioned = Array.isArray(mentionedList) && mentionedList.length > 0
+      ? true
+      : message.includes(`@${NEW_BOT_NUMBER}`) || message.includes('081212882363') || message.includes('@');
 
-    // Proses hanya jika ADA MENTION dan ADA KATA KUNCI
     if (isMentioned && hasKeyword) {
       let nominal = 0;
       let tipe = msgLower.includes('pemasukan') ? 'pemasukan' : 'pengeluaran';
@@ -47,7 +50,7 @@ app.post('/webhook', async (req, res) => {
         if (!isNaN(cleanNum)) nominal = parseFloat(cleanNum);
       }
 
-      // Ekstraksi dari gambar via Gemini AI jika ada foto
+      // Ekstraksi dari gambar via Gemini AI
       if (imageUrl && GEMINI_API_KEY) {
         try {
           const imgResp = await axios.get(imageUrl, { responseType: 'arraybuffer' });
@@ -69,7 +72,7 @@ app.post('/webhook', async (req, res) => {
       await supabase.from('transactions').insert([
         {
           type: tipe,
-          category: 'WhatsApp Upload (Group)',
+          category: 'WhatsApp Upload',
           amount: nominal,
           description: message,
           proof_url: imageUrl,
@@ -79,7 +82,7 @@ app.post('/webhook', async (req, res) => {
 
       const replyText = `✅ *Data Berhasil Dicatat*\n💰 Nominal: Rp ${nominal.toLocaleString('id-ID')}\n📝 Keterangan: ${message}`;
 
-      // Kirim balasan balik ke Grup via API Fonnte
+      // Kirim balasan via API Fonnte
       if (target) {
         try {
           await axios.post('https://api.fonnte.com/send', {
