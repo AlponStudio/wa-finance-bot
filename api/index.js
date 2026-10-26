@@ -23,31 +23,34 @@ app.get('/webhook', (req, res) => res.status(200).send('Webhook Vercel Berhasil 
 
 app.post('/webhook', async (req, res) => {
   try {
-    // 1. PENGAMAN LOOPING: Abaikan jika pesan dikirim oleh bot sendiri
-    const isFromMe = req.body.fromMe || false;
     const sender = req.body.sender || '';
-    if (isFromMe || sender.includes(BOT_NUMBER)) {
-      return res.status(200).send('OK');
-    }
-
     const message = req.body.message || req.body.text || '';
     const imageUrl = req.body.url || req.body.file || '';
     
-    // Target balasan: ID Grup (jika pesan dari grup) atau nomor pengirim (jika PM)
-    const target = req.body.group || req.body.target || req.body.sender || '';
+    // PENGAMAN 1: Abaikan jika pesan berasal dari nomor bot sendiri
+    if (!sender || sender.includes(BOT_NUMBER) || req.body.fromMe) {
+      return res.status(200).send('OK');
+    }
+
+    // PENGAMAN 2: Abaikan jika pesan yang masuk mengandung format teks balasan bot sendiri
+    if (message.includes('Pencatatan Berhasil') || message.includes('Nominal: Rp')) {
+      return res.status(200).send('OK');
+    }
+
+    // Target balasan: ID Grup (jika pesan dari grup) atau nomor pengirim (jika personal)
+    const target = req.body.group || req.body.target || sender;
 
     const msgLower = message.toLowerCase();
     const hasKeyword = msgLower.includes('pengajuan reimburse') || msgLower.includes('pemasukan');
 
-    // Cek fleksibel mention
+    // Cek fleksibel mention untuk Grup
     const mentionedList = req.body.mentioned || [];
     const isMentioned = (Array.isArray(mentionedList) && mentionedList.length > 0)
       || message.includes('@')
       || message.includes(BOT_NUMBER);
 
-    // Untuk pesan personal (bukan grup), izinkan tanpa mention asal ada kata kunci
     const isGroup = !!req.body.group;
-    const shouldProcess = isGroup ? (isMentioned && hasKeyword) : hasKeyword;
+    const shouldProcess = isGroup ? (hasKeyword && isMentioned) : hasKeyword;
 
     if (shouldProcess) {
       let nominal = 0;
@@ -90,8 +93,9 @@ app.post('/webhook', async (req, res) => {
         }
       ]);
 
-      // Format teks balasan (Hindari kata "pengajuan reimburse" di balasan agar aman dari loop)
-      const replyText = `✅ *Pencatatan Berhasil*\n💰 Nominal: Rp ${nominal.toLocaleString('id-ID')}\n📝 Catatan: ${message}`;
+      // AMAN: Potong deskripsi agar tidak mencantumkan kata trigger 'pengajuan reimburse'
+      const cleanNote = message.replace(/pengajuan reimburse/gi, '').replace(/pemasukan/gi, '').trim();
+      const replyText = `✅ *Pencatatan Berhasil*\n💰 Nominal: Rp ${nominal.toLocaleString('id-ID')}\n📝 Catatan: ${cleanNote || '-'}`;
 
       // Kirim balasan tunggal via API Fonnte
       if (target) {
