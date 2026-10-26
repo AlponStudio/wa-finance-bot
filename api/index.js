@@ -7,9 +7,11 @@ const app = express();
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
+// Data API & Nomor HP milikmu
 const SUPABASE_URL = 'https://qqkusyfjyknbitzudgbj.supabase.co'; 
 const SUPABASE_KEY = 'sb_publishable_eIyoWRMJc7DNWlrdQpOitg_3cMBhTWv'; 
 const GEMINI_API_KEY = 'AQ.Ab8RN6LIaF8mi-HGl23weV1GX99LdnH2wEdCdFB8ezz-_N7Xkw'; 
+const MY_PHONE_NUMBER = '6289668184078'; 
 
 const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
 const genAI = new GoogleGenerativeAI(GEMINI_API_KEY);
@@ -21,10 +23,17 @@ app.post('/webhook', async (req, res) => {
   try {
     const message = req.body.message || req.body.text || '';
     const imageUrl = req.body.url || req.body.file || '';
+    
+    // Cek apakah nomor kamu di-tag / di-mention
+    const mentionedList = req.body.mentioned || [];
+    const isMentioned = Array.isArray(mentionedList) 
+      ? mentionedList.includes(MY_PHONE_NUMBER) 
+      : message.includes(`@${MY_PHONE_NUMBER}`) || message.includes('089668184078') || message.includes('@bot');
 
     const msgLower = message.toLowerCase();
 
-    if (msgLower.includes('pengajuan reimburse') || msgLower.includes('pemasukan')) {
+    // Hanya proses jika nomor kamu DI-TAG dan mengandung kata kunci
+    if (isMentioned && (msgLower.includes('pengajuan reimburse') || msgLower.includes('pemasukan'))) {
       let nominal = 0;
       let tipe = msgLower.includes('pemasukan') ? 'pemasukan' : 'pengeluaran';
 
@@ -35,7 +44,7 @@ app.post('/webhook', async (req, res) => {
         if (!isNaN(cleanNum)) nominal = parseFloat(cleanNum);
       }
 
-      // Ekstraksi dari gambar lewat Gemini AI jika ada
+      // Ekstraksi dari gambar via Gemini AI jika melampirkan foto
       if (imageUrl && GEMINI_API_KEY) {
         try {
           const imgResp = await axios.get(imageUrl, { responseType: 'arraybuffer' });
@@ -53,7 +62,7 @@ app.post('/webhook', async (req, res) => {
         }
       }
 
-      // Simpan ke Supabase
+      // Simpan ke database Supabase
       await supabase.from('transactions').insert([
         {
           type: tipe,
@@ -65,10 +74,8 @@ app.post('/webhook', async (req, res) => {
         }
       ]);
 
-      // Teks Pesan Balasan
       const replyText = `✅ *Data Berhasil Dicatat*\n💰 Nominal: Rp ${nominal.toLocaleString('id-ID')}\n📝 Keterangan: ${message}`;
 
-      // Format JSON respons khusus Fonnte (mencakup 'reply' dan 'text')
       return res.status(200).json({
         status: true,
         reply: replyText,
@@ -76,6 +83,7 @@ app.post('/webhook', async (req, res) => {
       });
     }
 
+    // Jika tidak di-tag / kata kunci salah, abaikan
     res.status(200).send('OK');
   } catch (err) {
     console.error('General Error:', err);
