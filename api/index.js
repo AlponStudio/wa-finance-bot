@@ -13,9 +13,6 @@ const SUPABASE_KEY = 'sb_publishable_eIyoWRMJc7DNWlrdQpOitg_3cMBhTWv';
 const GEMINI_API_KEY = 'AQ.Ab8RN6LIaF8mi-HGl23weV1GX99LdnH2wEdCdFB8ezz-_N7Xkw'; 
 const FONNTE_TOKEN = 'nbwwLRG5gzP4UK9oAvHQ'; 
 
-// Nomor Bot Baru
-const NEW_BOT_NUMBER = '6281212882363';
-
 const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
 const genAI = new GoogleGenerativeAI(GEMINI_API_KEY);
 
@@ -27,19 +24,13 @@ app.post('/webhook', async (req, res) => {
     const message = req.body.message || req.body.text || '';
     const imageUrl = req.body.url || req.body.file || '';
     
-    // Target balasan (ID Grup atau Nomor Pengirim)
+    // Tangkap ID Target (Di grup: req.body.group, req.body.sender, atau req.body.target)
     const target = req.body.group || req.body.target || req.body.sender || '';
 
     const msgLower = message.toLowerCase();
-    const hasKeyword = msgLower.includes('pengajuan reimburse') || msgLower.includes('pemasukan');
 
-    // Cek mention nomor baru atau tanda @
-    const mentionedList = req.body.mentioned || [];
-    const isMentioned = Array.isArray(mentionedList) && mentionedList.length > 0
-      ? true
-      : message.includes(`@${NEW_BOT_NUMBER}`) || message.includes('081212882363') || message.includes('@');
-
-    if (isMentioned && hasKeyword) {
+    // Pengecekan Kata Kunci
+    if (msgLower.includes('pengajuan reimburse') || msgLower.includes('pemasukan')) {
       let nominal = 0;
       let tipe = msgLower.includes('pemasukan') ? 'pemasukan' : 'pengeluaran';
 
@@ -50,7 +41,7 @@ app.post('/webhook', async (req, res) => {
         if (!isNaN(cleanNum)) nominal = parseFloat(cleanNum);
       }
 
-      // Ekstraksi dari gambar via Gemini AI
+      // Ekstraksi dari gambar via Gemini AI jika ada foto
       if (imageUrl && GEMINI_API_KEY) {
         try {
           const imgResp = await axios.get(imageUrl, { responseType: 'arraybuffer' });
@@ -82,7 +73,7 @@ app.post('/webhook', async (req, res) => {
 
       const replyText = `✅ *Data Berhasil Dicatat*\n💰 Nominal: Rp ${nominal.toLocaleString('id-ID')}\n📝 Keterangan: ${message}`;
 
-      // Kirim balasan via API Fonnte
+      // 1. Tembak langsung API Fonnte untuk balasan ke Grup / PM
       if (target) {
         try {
           await axios.post('https://api.fonnte.com/send', {
@@ -96,6 +87,7 @@ app.post('/webhook', async (req, res) => {
         }
       }
 
+      // 2. Beri respon JSON standar webhook Fonnte
       return res.status(200).json({ status: true, reply: replyText });
     }
 
