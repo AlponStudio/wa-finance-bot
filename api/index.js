@@ -6,22 +6,26 @@ const axios = require('axios');
 const app = express();
 app.use(express.json());
 
-// Ganti teks di dalam tanda petik dengan Kunci Asli milikmu
+// Masukkan API Key kamu di sini
 const SUPABASE_URL = 'https://qqkusyfjyknbitzudgbj.supabase.co/rest/v1/'; 
-const SUPABASE_KEY = 'sb_secret_UKBLR
-UH72E3qqkq7JT9Ypw_pOWjfzFN'; 
+const SUPABASE_KEY = 'sb_publishable_eIyoWRMJc7DNWlrdQpOitg_3cMBhTWv'; 
 const GEMINI_API_KEY = 'AQ.Ab8RN6LIaF8mi-HGl23weV1GX99LdnH2wEdCdFB8ezz-_N7Xkw'; 
 
 const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
 const genAI = new GoogleGenerativeAI(GEMINI_API_KEY);
 
-// Handler untuk Tes di Browser (GET)
-app.get('*', (req, res) => {
+// Root path test
+app.get('/', (req, res) => {
+  res.status(200).send('Server Vercel Aktif!');
+});
+
+// Endpoint Webhook untuk GET
+app.get('/webhook', (req, res) => {
   res.status(200).send('Webhook Vercel Berhasil Aktif!');
 });
 
-// Handler untuk Menerima Pesan WhatsApp dari Fonnte (POST)
-app.post('*', async (req, res) => {
+// Endpoint Webhook untuk POST
+app.post('/webhook', async (req, res) => {
   try {
     const message = req.body.message || '';
     const imageUrl = req.body.url || '';
