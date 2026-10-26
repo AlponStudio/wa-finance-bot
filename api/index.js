@@ -7,8 +7,9 @@ const app = express();
 app.use(express.json());
 
 // Ganti teks di bawah dengan API Key asli kamu
-const SUPABASE_URL = 'https://qqkusyfjyknbitzudgbj.supabase.co'; 
-const SUPABASE_KEY = 'PASTE_ANON_KEY_KAMU_DI_SINI';
+const SUPABASE_URL = 'https://qqkusyfjyknbitzudgbj.supabase.co/rest/v1/'; 
+const SUPABASE_KEY = 'sb_secret_UKBLR
+UH72E3qqkq7JT9Ypw_pOWjfzFN';
 const GEMINI_API_KEY = 'PASTE_GEMINI_KEY_KAMU_DI_SINI';
 
 const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
