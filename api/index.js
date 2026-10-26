@@ -6,22 +6,22 @@ const axios = require('axios');
 const app = express();
 app.use(express.json());
 
-// Ganti teks di bawah dengan API Key asli kamu
+// Ganti teks di dalam tanda petik dengan Kunci Asli milikmu
 const SUPABASE_URL = 'https://qqkusyfjyknbitzudgbj.supabase.co/rest/v1/'; 
 const SUPABASE_KEY = 'sb_secret_UKBLR
-UH72E3qqkq7JT9Ypw_pOWjfzFN';
-const GEMINI_API_KEY = 'PASTE_GEMINI_KEY_KAMU_DI_SINI';
+UH72E3qqkq7JT9Ypw_pOWjfzFN'; 
+const GEMINI_API_KEY = 'AQ.Ab8RN6LIaF8mi-HGl23weV1GX99LdnH2wEdCdFB8ezz-_N7Xkw'; 
 
 const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
 const genAI = new GoogleGenerativeAI(GEMINI_API_KEY);
 
-// 1. Tambahkan handler GET agar Fonnte & Browser tidak error saat cek URL
-app.get('/webhook', (req, res) => {
-  res.status(200).send('Webhook Vercel Aktif!');
+// Handler untuk Tes di Browser (GET)
+app.get('*', (req, res) => {
+  res.status(200).send('Webhook Vercel Berhasil Aktif!');
 });
 
-// 2. Handler POST untuk memproses pesan WhatsApp dari Fonnte
-app.post('/webhook', async (req, res) => {
+// Handler untuk Menerima Pesan WhatsApp dari Fonnte (POST)
+app.post('*', async (req, res) => {
   try {
     const message = req.body.message || '';
     const imageUrl = req.body.url || '';
@@ -64,7 +64,7 @@ app.post('/webhook', async (req, res) => {
     res.status(200).send('OK');
   } catch (err) {
     console.error(err);
-    res.status(500).send('Error');
+    res.status(500).send('Error processing request');
   }
 });
 
