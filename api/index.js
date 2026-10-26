@@ -13,6 +13,8 @@ const SUPABASE_KEY = 'sb_publishable_eIyoWRMJc7DNWlrdQpOitg_3cMBhTWv';
 const GEMINI_API_KEY = 'AQ.Ab8RN6LIaF8mi-HGl23weV1GX99LdnH2wEdCdFB8ezz-_N7Xkw'; 
 const FONNTE_TOKEN = 'nbwwLRG5gzP4UK9oAvHQ'; 
 
+const BOT_NUMBER = '6281212882363';
+
 const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
 const genAI = new GoogleGenerativeAI(GEMINI_API_KEY);
 
@@ -21,16 +23,33 @@ app.get('/webhook', (req, res) => res.status(200).send('Webhook Vercel Berhasil 
 
 app.post('/webhook', async (req, res) => {
   try {
+    // 1. PENGAMAN LOOPING: Abaikan jika pesan dikirim oleh bot sendiri
+    const isFromMe = req.body.fromMe || false;
+    const sender = req.body.sender || '';
+    if (isFromMe || sender.includes(BOT_NUMBER)) {
+      return res.status(200).send('OK');
+    }
+
     const message = req.body.message || req.body.text || '';
     const imageUrl = req.body.url || req.body.file || '';
     
-    // Tangkap ID Target (Di grup: req.body.group, req.body.sender, atau req.body.target)
+    // Target balasan: ID Grup (jika pesan dari grup) atau nomor pengirim (jika PM)
     const target = req.body.group || req.body.target || req.body.sender || '';
 
     const msgLower = message.toLowerCase();
+    const hasKeyword = msgLower.includes('pengajuan reimburse') || msgLower.includes('pemasukan');
 
-    // Pengecekan Kata Kunci
-    if (msgLower.includes('pengajuan reimburse') || msgLower.includes('pemasukan')) {
+    // Cek fleksibel mention
+    const mentionedList = req.body.mentioned || [];
+    const isMentioned = (Array.isArray(mentionedList) && mentionedList.length > 0)
+      || message.includes('@')
+      || message.includes(BOT_NUMBER);
+
+    // Untuk pesan personal (bukan grup), izinkan tanpa mention asal ada kata kunci
+    const isGroup = !!req.body.group;
+    const shouldProcess = isGroup ? (isMentioned && hasKeyword) : hasKeyword;
+
+    if (shouldProcess) {
       let nominal = 0;
       let tipe = msgLower.includes('pemasukan') ? 'pemasukan' : 'pengeluaran';
 
@@ -41,7 +60,7 @@ app.post('/webhook', async (req, res) => {
         if (!isNaN(cleanNum)) nominal = parseFloat(cleanNum);
       }
 
-      // Ekstraksi dari gambar via Gemini AI jika ada foto
+      // Ekstraksi dari gambar via Gemini AI jika melampirkan foto
       if (imageUrl && GEMINI_API_KEY) {
         try {
           const imgResp = await axios.get(imageUrl, { responseType: 'arraybuffer' });
@@ -63,7 +82,7 @@ app.post('/webhook', async (req, res) => {
       await supabase.from('transactions').insert([
         {
           type: tipe,
-          category: 'WhatsApp Upload',
+          category: isGroup ? 'WhatsApp Group' : 'WhatsApp Personal',
           amount: nominal,
           description: message,
           proof_url: imageUrl,
@@ -71,9 +90,10 @@ app.post('/webhook', async (req, res) => {
         }
       ]);
 
-      const replyText = `✅ *Data Berhasil Dicatat*\n💰 Nominal: Rp ${nominal.toLocaleString('id-ID')}\n📝 Keterangan: ${message}`;
+      // Format teks balasan (Hindari kata "pengajuan reimburse" di balasan agar aman dari loop)
+      const replyText = `✅ *Pencatatan Berhasil*\n💰 Nominal: Rp ${nominal.toLocaleString('id-ID')}\n📝 Catatan: ${message}`;
 
-      // 1. Tembak langsung API Fonnte untuk balasan ke Grup / PM
+      // Kirim balasan tunggal via API Fonnte
       if (target) {
         try {
           await axios.post('https://api.fonnte.com/send', {
@@ -87,8 +107,7 @@ app.post('/webhook', async (req, res) => {
         }
       }
 
-      // 2. Beri respon JSON standar webhook Fonnte
-      return res.status(200).json({ status: true, reply: replyText });
+      return res.status(200).send('OK');
     }
 
     res.status(200).send('OK');
