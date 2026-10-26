@@ -5,7 +5,7 @@ const axios = require('axios');
 
 const app = express();
 app.use(express.json());
-app.use(express.urlencoded({ extended: true })); // Menerima data form-urlencoded dari Fonnte
+app.use(express.urlencoded({ extended: true }));
 
 const SUPABASE_URL = 'https://qqkusyfjyknbitzudgbj.supabase.co'; 
 const SUPABASE_KEY = 'sb_publishable_eIyoWRMJc7DNWlrdQpOitg_3cMBhTWv'; 
@@ -19,12 +19,8 @@ app.get('/webhook', (req, res) => res.status(200).send('Webhook Vercel Berhasil 
 
 app.post('/webhook', async (req, res) => {
   try {
-    // Tangkap data dari Fonnte (bisa berupa JSON atau Form-Data)
     const message = req.body.message || req.body.text || '';
     const imageUrl = req.body.url || req.body.file || '';
-    const sender = req.body.sender || '';
-
-    console.log('Pesan Masuk:', { message, imageUrl, sender });
 
     const msgLower = message.toLowerCase();
 
@@ -32,14 +28,14 @@ app.post('/webhook', async (req, res) => {
       let nominal = 0;
       let tipe = msgLower.includes('pemasukan') ? 'pemasukan' : 'pengeluaran';
 
-      // Ekstraksi nominal otomatis dari teks pesan (misal: "50000" atau "50.000")
+      // Ekstraksi nominal angka dari teks
       const matches = message.match(/\d[\d.,]*/g);
       if (matches) {
         const cleanNum = matches[matches.length - 1].replace(/[.,]/g, '');
         if (!isNaN(cleanNum)) nominal = parseFloat(cleanNum);
       }
 
-      // Jika ada gambar, coba ekstrak lewat Gemini AI
+      // Ekstraksi dari gambar lewat Gemini AI jika ada
       if (imageUrl && GEMINI_API_KEY) {
         try {
           const imgResp = await axios.get(imageUrl, { responseType: 'arraybuffer' });
@@ -57,8 +53,8 @@ app.post('/webhook', async (req, res) => {
         }
       }
 
-      // Simpan data transaksi ke Supabase
-      const { error: dbError } = await supabase.from('transactions').insert([
+      // Simpan ke Supabase
+      await supabase.from('transactions').insert([
         {
           type: tipe,
           category: 'WhatsApp Upload',
@@ -69,13 +65,14 @@ app.post('/webhook', async (req, res) => {
         }
       ]);
 
-      if (dbError) {
-        console.error('Supabase DB Error:', dbError);
-      }
+      // Teks Pesan Balasan
+      const replyText = `✅ *Data Berhasil Dicatat*\n💰 Nominal: Rp ${nominal.toLocaleString('id-ID')}\n📝 Keterangan: ${message}`;
 
-      // Format balasan otomatis untuk Fonnte
-      return res.json({
-        reply: `✅ *Data Berhasil Dicatat*\n💰 Nominal: Rp ${nominal.toLocaleString('id-ID')}\n📝 Keterangan: ${message}`
+      // Format JSON respons khusus Fonnte (mencakup 'reply' dan 'text')
+      return res.status(200).json({
+        status: true,
+        reply: replyText,
+        text: replyText
       });
     }
 
