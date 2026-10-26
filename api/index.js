@@ -12,7 +12,7 @@ const SUPABASE_URL = 'https://qqkusyfjyknbitzudgbj.supabase.co';
 const SUPABASE_KEY = 'sb_publishable_eIyoWRMJc7DNWlrdQpOitg_3cMBhTWv'; 
 const GEMINI_API_KEY = 'AQ.Ab8RN6LIaF8mi-HGl23weV1GX99LdnH2wEdCdFB8ezz-_N7Xkw'; 
 const MY_PHONE_NUMBER = '6289668184078'; 
-const FONNTE_TOKEN = 'nbwwLRG5gzP4UK9oAvHQ'; // Token Fonnte milikmu
+const FONNTE_TOKEN = 'nbwwLRG5gzP4UK9oAvHQ'; 
 
 const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
 const genAI = new GoogleGenerativeAI(GEMINI_API_KEY);
@@ -22,10 +22,14 @@ app.get('/webhook', (req, res) => res.status(200).send('Webhook Vercel Berhasil 
 
 app.post('/webhook', async (req, res) => {
   try {
+    // Fonnte mengirimkan 'target' atau 'group' atau 'sender'
     const message = req.body.message || req.body.text || '';
     const imageUrl = req.body.url || req.body.file || '';
-    const sender = req.body.sender || ''; // Nomor HP pengirim pesan
+    
+    // Untuk grup, target balasan adalah ID grup (req.body.group atau req.body.target)
+    const target = req.body.group || req.body.target || req.body.sender || '';
 
+    // Cek apakah nomor kamu di-tag / di-mention
     const mentionedList = req.body.mentioned || [];
     const isMentioned = Array.isArray(mentionedList) 
       ? mentionedList.includes(MY_PHONE_NUMBER) 
@@ -33,7 +37,7 @@ app.post('/webhook', async (req, res) => {
 
     const msgLower = message.toLowerCase();
 
-    // Jalankan hanya jika di-tag DAN ada kata kunci 'pengajuan reimburse' / 'pemasukan'
+    // Jalankan jika di-tag DAN ada kata kunci
     if (isMentioned && (msgLower.includes('pengajuan reimburse') || msgLower.includes('pemasukan'))) {
       let nominal = 0;
       let tipe = msgLower.includes('pemasukan') ? 'pemasukan' : 'pengeluaran';
@@ -45,7 +49,7 @@ app.post('/webhook', async (req, res) => {
         if (!isNaN(cleanNum)) nominal = parseFloat(cleanNum);
       }
 
-      // Ekstraksi dari gambar via Gemini AI jika melampirkan gambar
+      // Ekstraksi dari gambar via Gemini AI jika ada foto
       if (imageUrl && GEMINI_API_KEY) {
         try {
           const imgResp = await axios.get(imageUrl, { responseType: 'arraybuffer' });
@@ -63,11 +67,11 @@ app.post('/webhook', async (req, res) => {
         }
       }
 
-      // Simpan data ke database Supabase
+      // Simpan data ke Supabase
       await supabase.from('transactions').insert([
         {
           type: tipe,
-          category: 'WhatsApp Upload',
+          category: 'WhatsApp Upload (Group)',
           amount: nominal,
           description: message,
           proof_url: imageUrl,
@@ -77,11 +81,11 @@ app.post('/webhook', async (req, res) => {
 
       const replyText = `✅ *Data Berhasil Dicatat*\n💰 Nominal: Rp ${nominal.toLocaleString('id-ID')}\n📝 Keterangan: ${message}`;
 
-      // Kirim pesan balasan langsung via API Fonnte
-      if (sender) {
+      // Tembak API Fonnte untuk membalas langsung ke Grup
+      if (target) {
         try {
           await axios.post('https://api.fonnte.com/send', {
-            target: sender,
+            target: target,
             message: replyText
           }, {
             headers: { 'Authorization': FONNTE_TOKEN }
